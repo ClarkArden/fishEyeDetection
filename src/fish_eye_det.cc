@@ -9,7 +9,6 @@ FishEyeDet::FishEyeDet(int width, int height,
                        int scale)
     :width_(width), height_(height),scale_(scale) {
 
-        // cv::Mat raw_img = ReadRawImg(obg_img_path, 640, 512);
         
         LoadCameraParameters("/home/fitz/project/fishEyeDect/data/settings.yaml",intrinsics_, coeff_);
         init_calib_data();

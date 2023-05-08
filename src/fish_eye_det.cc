@@ -35,6 +35,7 @@ FishEyeDet::FishEyeDet(int width, int height,
 
 
 
+
         // cv::Mat obj_padding, scene_padding;;
         // int padding = 100;
         // cv::copyMakeBorder(obj_src_img_,obj_padding, padding, padding, padding, padding, cv::BORDER_CONSTANT,cv::Scalar(0));

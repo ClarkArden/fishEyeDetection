@@ -106,10 +106,8 @@ public:
     ~FishEyeDet();
 
 private:
-    cv::Mat ReadImage(std::string filename);
     cv::Mat ReadRawImg(std::string filename, int width, int height);
     void LoadCameraParameters(std::string filename, cv::Mat &K, cv::Mat &distcoef);
-    void ShowImg(cv::Mat img);
     cv::Mat Resize(cv::Mat img, int scale);
     void GetFrame(std::string filename);
     cv::Mat GetDetectImg(unsigned char* src_data);
@@ -119,12 +117,6 @@ private:
     cv::Mat GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::Mat H);
     cv::Mat Detect(cv::Mat img, cv::Mat background);
     void imgstrech16_to_8(unsigned short * img,uint8_t* out,int w,int h);
-    cv::Mat undistortInverse(cv::Mat distorted_image, cv::Mat camera_matrix, cv::Mat distortion_coefficients);
-    void FillDistortedAddr(yx_addr *undistorted_yx, struct yx_addr* distorted_yx, int w, int h, cv::Mat k, cv::Mat coled);
-    void FillUndistortedAddr(struct yx_addr* undistorted_yx,int w,int h, cv::Mat dist, cv::Mat coled);
-    void FillUndistortedAlignedAddr(struct yx_addr* undistorted_yx, struct yx_addr* undistorted_aligned_yx, int w, int h, cv::Mat h_amt);
-    void ResampleDistortedImage(unsigned char* distorted_image, unsigned char* resample_distorted_image, struct yx_addr* undistorted_yx, struct yx_addr* undistorted_aligned_yx, int w,int h);
-    void ShowCoordinatesDistortedImage(struct yx_addr* coordinate,cv::Mat in, cv::Mat &out, int w, int h);
     void init_calib_data();
     void init_calib_data_visibleLight();
     void undistort(int distorted_image_w, int distorted_image_h,unsigned char* distorted_image, unsigned char* undistorted_image, struct calib_data* calib_data, float fc);

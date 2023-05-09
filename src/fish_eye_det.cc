@@ -1,7 +1,5 @@
 #include "fish_eye_det.hpp"
 #include "gettarget.h"
-// #include "../include/gettarget.h"
-// #include "../include/fish_eye_det.hpp"
 extern struct tgt L_tgt[MAX_NUM_L_tgt];
 extern struct tgt L_tgt_0[MAX_NUM_TARGET];
 
@@ -18,6 +16,8 @@ FishEyeDet::FishEyeDet(int width, int height,
         undistort_scene_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
 
         GetFrame("/home/fitz/project/tests/fif2.avi");
+        
+        // 1
 
         // obj_src_img_ = ReadImage(obg_img_path);
         // scene_src_img_ = ReadImage(scene_img_path);

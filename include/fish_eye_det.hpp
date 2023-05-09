@@ -51,7 +51,7 @@ private:
     int scale_;          // percentage of original image
     int width_; 
     int height_;
-    int channels_ = 1;
+    int channels_;
     cv::Mat obj_src_img_;
     cv::Mat scene_src_img_;
 

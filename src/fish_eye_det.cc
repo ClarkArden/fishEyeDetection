@@ -6,11 +6,14 @@ extern struct tgt L_tgt_0[MAX_NUM_TARGET];
 
 
 FishEyeDet::FishEyeDet(int width, int height,
-                       int scale)
-    :width_(width), height_(height),scale_(scale) {
+                       int channels)
+    :width_(width), height_(height),channels_(channels) {
 
-        
-        init_calib_data();
+        if(channels_ == 1){
+            init_calib_data();
+        }else{
+            init_calib_data_visibleLight();
+        }
         undistort_obj_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
         undistort_scene_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
 
@@ -178,7 +181,7 @@ cv::Mat FishEyeDet::GetDetectImg(unsigned char* src_data)
             undistort(first_frame_.cols, first_frame_.rows, first_frame_.data,undistort_obj_img_.get(),&hw_calib_data, 6.0 );
             obj_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
         }else{
-            undistort(first_frame_.cols, first_frame_.rows, first_frame_.data,undistort_obj_img_.get(),&kj_calib_data, 6.0 );
+            undistort_visble(first_frame_.cols, first_frame_.rows, first_frame_.data,undistort_obj_img_.get(),&kj_calib_data, 6.0 );
             obj_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC3);
         }
         obj_image_.data = undistort_obj_img_.get();
@@ -190,7 +193,7 @@ cv::Mat FishEyeDet::GetDetectImg(unsigned char* src_data)
         undistort(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&hw_calib_data, 6.0 );
         scene_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
     }else{
-        undistort(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&kj_calib_data, 6.0 );
+        undistort_visble(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&kj_calib_data, 6.0 );
         scene_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC3);
     }
     scene_image_.data = undistort_scene_img_.get();
@@ -484,7 +487,7 @@ cv::Mat  FishEyeDet::Detect(cv::Mat img, cv::Mat background){
         }
     }
     cv::imshow("detect show",detec_img);
-    // cv::waitKey(20);
+    cv::waitKey(20);
 
     // bbox.print_info();
     // std::cout<<"x="<<L_tgt[0].x<<"y = "<<L_tgt[0].y<<"w="<<L_tgt[0].w<<"h="<<L_tgt[0].h<<std::endl;

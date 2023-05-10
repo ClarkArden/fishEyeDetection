@@ -1,6 +1,6 @@
 #pragma once
-#define SIZEW_SEARCH (640) 
-#define SIZEH_SEARCH (512)
+#define SIZEW_SEARCH (2448) 
+#define SIZEH_SEARCH (2048)
 #define MAX_NUM_L_tgt 2000
 #define MAX_NUM_TARGET 200
 #define MAX_ANGLE_CHANGE 0.175

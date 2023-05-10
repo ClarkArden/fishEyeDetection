@@ -11,8 +11,8 @@
 #include <opencv2/imgproc.hpp>
 #include "gettarget.h"
 
-#define UNDISTORT_H (512)
-#define UNDISTORT_W (640)
+#define UNDISTORT_H (2048)
+#define UNDISTORT_W (2448)
 
 struct Bbox {
     int x;
@@ -83,6 +83,7 @@ private:
    
     
     cv::Size corrected_size_ = cv::Size(3000,3000);
+    cv::Size re_size_ = cv::Size(UNDISTORT_W, UNDISTORT_H);
 
 
     struct calib_data hw_calib_data;

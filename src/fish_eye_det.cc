@@ -17,7 +17,8 @@ FishEyeDet::FishEyeDet(int width, int height,
         undistort_obj_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
         undistort_scene_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
 
-        GetFrame("/home/fitz/project/tests/fif2.avi");
+        GetFrame("/home/fitz/Downloads/img_data/kejian/60/Video_20230509153518256.avi");
+        // GetFrame("/home/fitz/project/tests/fif2.avi");
     
         
     }
@@ -119,43 +120,70 @@ void FishEyeDet::GetFrame(std::string filename)
     cv::Mat first_frame, frame, first_frame_gray, frame_gray;
     bool first_flag = true;
     cv::Mat obj_image;
+    cv::Mat source_img;
     std::unique_ptr<uint8_t[]> undistort_obj_img(new uint8_t[UNDISTORT_H * UNDISTORT_W]);
     std::unique_ptr<uint8_t[]> undistort_scene_img(new uint8_t[UNDISTORT_H * UNDISTORT_W]);
     
     while(1){
         if(first_flag){
             capture >> first_frame;
+
+            // capture >> source_img;
+            // cv::resize(source_img, first_frame, re_size_);
+
+            // std::cout << "size"<<first_frame.size() <<std::endl;
+            // cv::imshow("first_frame", first_frame);
+            // cv::waitKey(0);
+
             cv::cvtColor(first_frame,first_frame_gray, cv::COLOR_RGB2GRAY);
-            undistort(first_frame_gray.cols, first_frame_gray.rows, first_frame_gray.data,undistort_obj_img.get(), &hw_calib_data, 6.0);
+            if(channels_ == 1){
+                undistort(first_frame_gray.cols, first_frame_gray.rows, first_frame_gray.data, undistort_obj_img.get(), &hw_calib_data, 6.0);
+                // undistort(2448, 2048, first_frame_gray.data,undistort_obj_img.get(), &hw_calib_data, 6.0);
+            }else{
+                undistort_visble(first_frame_gray.cols, first_frame_gray.rows, first_frame_gray.data, undistort_obj_img.get(), &kj_calib_data, 6.0);
+            }
             obj_image.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
             obj_image.data = undistort_obj_img.get();
             first_flag = false;
         }
-        capture >> frame;
+        capture >> frame ;
+        // capture >> source_img ;
 
          if(frame.empty()){
             break;
         }
 
+        // cv::resize(source_img, frame, re_size_);
+
         cv::cvtColor(frame, frame_gray, cv::COLOR_RGB2GRAY);
-        undistort(frame_gray.cols, frame_gray.rows, frame_gray.data, undistort_scene_img.get(), &hw_calib_data, 6.0);
+        if(channels_ == 1){
+            undistort(frame_gray.cols, frame_gray.rows, frame_gray.data, undistort_scene_img.get(), &hw_calib_data, 6.0);
+        }else{
+            undistort_visble(frame_gray.cols, frame_gray.rows, frame_gray.data, undistort_scene_img.get(), &kj_calib_data, 6.0);
+        }
         cv::Mat scene_image(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1, undistort_scene_img.get());
         std::cout<<"obj image: "<<frame.channels()<<std::endl;
 
         auto tik = std::chrono::system_clock::now();
+        
+        cv::Mat obj_image_resize, scene_image_resize;
 
-        ExtractORBFeature(obj_image, scene_image);
+        cv::resize(obj_image, obj_image_resize,cv::Size(1224,1024));
+        cv::resize(scene_image, scene_image_resize,cv::Size(1224,1024));
+        
+
+        ExtractORBFeature(obj_image_resize, scene_image_resize);
         // H_ = ComputeHMatrix();
         // cv::Mat foreground_img = GetForegroundImage(obj_image, scene_image ,H_);
         // Detect(foreground_img, scene_image);
 
-        cv::Mat black_mat = cv::Mat::zeros(obj_image.size(), CV_8UC1);
+        cv::Mat black_mat = cv::Mat::zeros(obj_image_resize.size(), CV_8UC1);
         if(!less_keypoints_flag_ && !less_keypoints_ransac_flag_){        //if keypoints less than 4
             H_ = ComputeHMatrix();
-            cv::Mat foreground_img = GetForegroundImage(obj_image, scene_image ,H_);
-            Detect(foreground_img, scene_image);
+            cv::Mat foreground_img = GetForegroundImage(obj_image_resize, scene_image_resize ,H_);
+            Detect(foreground_img, scene_image_resize);
         }else{
-            Detect(black_mat, scene_image);
+            Detect(black_mat, scene_image_resize);
         }
         auto tok = std::chrono::system_clock::now();
 
@@ -179,23 +207,30 @@ cv::Mat FishEyeDet::GetDetectImg(unsigned char* src_data)
         first_frame_ = src_img_;
         if(channels_ == 1){
             undistort(first_frame_.cols, first_frame_.rows, first_frame_.data,undistort_obj_img_.get(),&hw_calib_data, 6.0 );
-            obj_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
         }else{
-            undistort_visble(first_frame_.cols, first_frame_.rows, first_frame_.data,undistort_obj_img_.get(),&kj_calib_data, 6.0 );
-            obj_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC3);
+            cv::Mat first_frame_gray;
+            cv::cvtColor(first_frame_, first_frame_gray, cv::COLOR_RGB2GRAY);
+            undistort_visble(first_frame_gray.cols, first_frame_gray.rows, first_frame_gray.data,undistort_obj_img_.get(),&kj_calib_data, 6.0 );
         }
+        obj_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
         obj_image_.data = undistort_obj_img_.get();
         first_flag_ = false;
     }
+    cv::Mat gray_frame;                                     // all image convert to gray img
+    if(channels_ == 3){
+        cv::cvtColor(src_img_, gray_frame,cv::COLOR_RGB2GRAY);
+    }else{
+        gray_frame = src_img_;
+    }
 
-    frame_ = src_img_;
+    frame_ = gray_frame;
+
     if(channels_ == 1){
         undistort(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&hw_calib_data, 6.0 );
-        scene_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
     }else{
         undistort_visble(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&kj_calib_data, 6.0 );
-        scene_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC3);
     }
+    scene_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
     scene_image_.data = undistort_scene_img_.get();
 
     auto tik = std::chrono::system_clock::now();
@@ -427,32 +462,18 @@ cv::Mat FishEyeDet::TransformFromObjToScene(cv::Mat obj_image, cv::Mat H)
 
 cv::Mat FishEyeDet::GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::Mat H) 
 {   
-    cv::Mat undist_img;
-    cv::Mat obj_img_gray, scene_img_gray;
-    if(channels_==1){
-        obj_img_gray = obj_img;
-        scene_img_gray = scene_img;
-    }else{
-        cv::cvtColor(obj_img,obj_img_gray,cv::COLOR_RGB2GRAY);
-        cv::cvtColor(scene_img,scene_img_gray,cv::COLOR_RGB2GRAY);
-    }
-
     std::cout << "H = " << H << std::endl;
 
-    cv::Mat img_T_scene = TransformFromObjToScene(obj_img_gray, H);
-    
-    int h = obj_img.rows;
-    int w = obj_img.cols;
-
+    cv::Mat img_T_scene = TransformFromObjToScene(obj_img, H);
 
     cv::imshow("Transform img scene", img_T_scene);
-    cv::imshow("origin obj scale", obj_img_gray);
-    cv::imshow("origin scene scale",scene_img_gray);
+    cv::imshow("undistort obj ", obj_img);
+    cv::imshow("undistort scene ",scene_img);
    
     cv::Mat diff, direct_diff;
     cv::Mat foreground_img;
-    cv::absdiff(img_T_scene, scene_img_gray, diff);               //转换后相减
-    cv::absdiff(obj_img_gray, scene_img_gray, direct_diff);  //两幅图直接相减（对比）
+    cv::absdiff(img_T_scene, scene_img, diff);               //转换后相减
+    cv::absdiff(obj_img, scene_img, direct_diff);  //两幅图直接相减（对比）
     cv::threshold(diff, foreground_img, 30, 255, cv::THRESH_BINARY);
     
     cv::imshow("direct diff", direct_diff);
@@ -467,11 +488,8 @@ cv::Mat FishEyeDet::GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::M
 
 cv::Mat  FishEyeDet::Detect(cv::Mat img, cv::Mat background){
     cv::Mat detec_img ;
-    if(channels_==1){
-        cv::cvtColor(background, detec_img ,cv::COLOR_GRAY2RGB);
-    }else{
-        detec_img = background;
-    }
+    cv::cvtColor(background, detec_img ,cv::COLOR_GRAY2RGB);
+    
     // PickDotTarget(img.data, img.cols, img.rows, 60, 1);
     Detectingtarget(img.data, NULL);
 
@@ -487,7 +505,7 @@ cv::Mat  FishEyeDet::Detect(cv::Mat img, cv::Mat background){
         }
     }
     cv::imshow("detect show",detec_img);
-    cv::waitKey(20);
+    cv::waitKey(0);
 
     // bbox.print_info();
     // std::cout<<"x="<<L_tgt[0].x<<"y = "<<L_tgt[0].y<<"w="<<L_tgt[0].w<<"h="<<L_tgt[0].h<<std::endl;

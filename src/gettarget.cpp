@@ -43,7 +43,10 @@ void Detectingtarget(unsigned char * formerimage/*,unsigned char *latterimage,fl
 	k=0;
 	for(i=0;i<targetnum;i++)
 	{
-		if(L_tgt[i].area>=4&&L_tgt[i].down - L_tgt[i].up>=2&& L_tgt[i].right - L_tgt[i].left >=2&&L_tgt[i].gray<2147483647)
+        float h_rate = L_tgt[i].down - L_tgt[i].up;
+        float w_rate = L_tgt[i].right - L_tgt[i].left;
+        float rate = h_rate / w_rate;
+		if(L_tgt[i].area>=20 && L_tgt[i].area<200 &&L_tgt[i].down - L_tgt[i].up>=5&& L_tgt[i].right - L_tgt[i].left >=5&& rate > 0.25 && rate < 4 &&L_tgt[i].gray<2147483647)
 		{
    			L_tgt[k].x=(L_tgt[i].x)/L_tgt[i].area;
 			L_tgt[k].y=(L_tgt[i].y)/L_tgt[i].area;
@@ -319,11 +322,11 @@ void Picktarget(unsigned char * buf,int w,int h,int threshold,int flag)
 	Orig_data=(unsigned char*)(buf);
 	if(flag==1)
 	{
-		for(i=2;i<h-2;i++)//154
+		for(i=2;i<h-10;i++)//154
 		{    
 			temp_num=0;	 
 			r=i*w;
-			for(j=3;j<w-3;j++)//128
+			for(j=10;j<w-10;j++)//128
 			{       
 				if(Orig_data[r+j]>threshold)
 				{                        

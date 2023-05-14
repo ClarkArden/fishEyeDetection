@@ -17,7 +17,7 @@ FishEyeDet::FishEyeDet(int width, int height,
         undistort_obj_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
         undistort_scene_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
 
-        GetFrame("/home/fitz/Downloads/img_data/kejian/60/Video_20230509153518256.avi");
+        GetFrame("/home/fitz/Downloads/img_data/kejian1/50/Video_20230509163621861.avi");
         // GetFrame("/home/fitz/project/tests/fif2.avi");
     
         
@@ -121,6 +121,7 @@ void FishEyeDet::GetFrame(std::string filename)
     bool first_flag = true;
     cv::Mat obj_image;
     cv::Mat source_img;
+    cv::Mat obj_image_resize, scene_image_resize;
     std::unique_ptr<uint8_t[]> undistort_obj_img(new uint8_t[UNDISTORT_H * UNDISTORT_W]);
     std::unique_ptr<uint8_t[]> undistort_scene_img(new uint8_t[UNDISTORT_H * UNDISTORT_W]);
     
@@ -166,10 +167,9 @@ void FishEyeDet::GetFrame(std::string filename)
 
         auto tik = std::chrono::system_clock::now();
         
-        cv::Mat obj_image_resize, scene_image_resize;
 
-        cv::resize(obj_image, obj_image_resize,cv::Size(1224,1024));
-        cv::resize(scene_image, scene_image_resize,cv::Size(1224,1024));
+        cv::resize(obj_image, obj_image_resize,cv::Size(824,624));
+        cv::resize(scene_image, scene_image_resize,cv::Size(824,624));
         
 
         ExtractORBFeature(obj_image_resize, scene_image_resize);
@@ -318,10 +318,14 @@ void FishEyeDet::ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img ){
     std::vector<cv::DMatch> good_matches;
     for(int i = 0; i < descriptors_obj_.rows; i++)
     {
-        if(matches[i].distance <= std::max(3 * min_dist, 30.0))
+        if(matches[i].distance <= std::max(3 * min_dist, 10.0))
         {
             good_matches.push_back(matches[i]);
         }
+        // if(matches[i].distance <= std::max(3 * min_dist, 30.0))
+        // {
+        //     good_matches.push_back(matches[i]);
+        // }
         // good_matches.push_back(matches[i]);
 
         // if(matches[i].distance <= 3*min_dist)
@@ -371,7 +375,8 @@ void FishEyeDet::ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img ){
     // compute fundamental matrix
     std::vector<uchar> RansacStatus;
     // cv::Mat fundamental_matrix = cv::findFundamentalMat(undist_point_obj, undist_point_scene, RansacStatus, cv::FM_RANSAC, 0.1, 0.99);
-    cv::Mat fundamental_matrix = cv::findFundamentalMat(point_obj, point_scene, RansacStatus, cv::FM_RANSAC);
+    // cv::Mat fundamental_matrix = cv::findFundamentalMat(point_obj, point_scene, RansacStatus, cv::FM_RANSAC);
+    cv::Mat fundamental_matrix = cv::findFundamentalMat(point_obj, point_scene, RansacStatus, cv::FM_RANSAC, 0.05, 0.99);
 
     // redifine  keypoints rr_keypoint and rr_matches to store new keypoints and fundamental matrix, 
     //deleting mismatched keypoints through  RansacStatus
@@ -409,8 +414,8 @@ void FishEyeDet::ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img ){
     // cv::Mat img_goodmatche;
 
 
-    cv::drawMatches(obj_img, rr_keypoints_obj,scene_img, rr_keypoints_scene, rr_matches, img_rr_matches);
-    cv::imshow("After RANSAC", img_rr_matches);
+    // cv::drawMatches(obj_img, rr_keypoints_obj,scene_img, rr_keypoints_scene, rr_matches, img_rr_matches);
+    // cv::imshow("After RANSAC", img_rr_matches);
     // cv::drawMatches(obj_img, keypoints_obj_, scene_img, keypoints_scene_, matches, img_matche);
     // cv::drawMatches(obj_img, keypoints_obj_, scene_img, keypoints_scene_, good_matches, img_goodmatche);
     // cv::imshow("matche img", img_matche);
@@ -466,23 +471,27 @@ cv::Mat FishEyeDet::GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::M
 
     cv::Mat img_T_scene = TransformFromObjToScene(obj_img, H);
 
-    cv::imshow("Transform img scene", img_T_scene);
-    cv::imshow("undistort obj ", obj_img);
-    cv::imshow("undistort scene ",scene_img);
+    // cv::imshow("Transform img scene", img_T_scene);
+    // cv::imshow("undistort obj ", obj_img);
+    // cv::imshow("undistort scene ",scene_img);
    
     cv::Mat diff, direct_diff;
-    cv::Mat foreground_img;
+    cv::Mat foreground_img, fore_out;
     cv::absdiff(img_T_scene, scene_img, diff);               //转换后相减
     cv::absdiff(obj_img, scene_img, direct_diff);  //两幅图直接相减（对比）
-    cv::threshold(diff, foreground_img, 30, 255, cv::THRESH_BINARY);
+    cv::threshold(diff, foreground_img, 15, 255, cv::THRESH_BINARY);
+    // cv::adaptiveThreshold(diff, foreground_img, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY_INV,11, 4);
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2,3));
+    cv::morphologyEx(foreground_img, fore_out, cv::MORPH_OPEN, kernel);
     
-    cv::imshow("direct diff", direct_diff);
-    cv::imshow("diff", diff);
-    cv::imshow("foreground", foreground_img);
+    // cv::imshow("direct diff", direct_diff);
+    // cv::imshow("diff", diff);
+    // cv::imshow("foreground", foreground_img);
+    // cv::imshow("open op img", fore_out);
     // cv::waitKey(0);
 
 
-    return foreground_img;
+    return fore_out;
 }
 
 
@@ -492,7 +501,6 @@ cv::Mat  FishEyeDet::Detect(cv::Mat img, cv::Mat background){
     
     // PickDotTarget(img.data, img.cols, img.rows, 60, 1);
     Detectingtarget(img.data, NULL);
-
     
   
     int count = 0;
@@ -500,12 +508,12 @@ cv::Mat  FishEyeDet::Detect(cv::Mat img, cv::Mat background){
         if(L_tgt_0[i].flag==1){
             count++;
             cv::rectangle(detec_img, cv::Point(L_tgt_0[i].x-L_tgt_0[i].w/2, L_tgt_0[i].y-L_tgt_0[i].h/2),
-            cv::Point(L_tgt_0[i].x+L_tgt_0[i].w/2, L_tgt_0[i].y+L_tgt_0[i].h/2),cv::Scalar(0,0,255),1);
+            cv::Point(L_tgt_0[i].x+L_tgt_0[i].w/2, L_tgt_0[i].y+L_tgt_0[i].h/2),cv::Scalar(0,0,255),2);
             
         }
     }
     cv::imshow("detect show",detec_img);
-    cv::waitKey(0);
+    cv::waitKey(1);
 
     // bbox.print_info();
     // std::cout<<"x="<<L_tgt[0].x<<"y = "<<L_tgt[0].y<<"w="<<L_tgt[0].w<<"h="<<L_tgt[0].h<<std::endl;

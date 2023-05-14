@@ -1,10 +1,10 @@
 #pragma once
-#define SIZEW_SEARCH (2448) 
-#define SIZEH_SEARCH (2048)
+#define SIZEW_SEARCH (824) 
+#define SIZEH_SEARCH (624)
 #define MAX_NUM_L_tgt 2000
 #define MAX_NUM_TARGET 200
 #define MAX_ANGLE_CHANGE 0.175
-#define CONFIDENCE_NUM 12
+#define CONFIDENCE_NUM 24
 
 
 struct tgt

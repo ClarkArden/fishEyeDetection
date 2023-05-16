@@ -10,9 +10,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "gettarget.h"
+#include "tic_toc.h"
 
-#define UNDISTORT_H (2048)
-#define UNDISTORT_W (2448)
+#define UNDISTORT_W (1024)
+#define UNDISTORT_H (824)
 
 struct Bbox {
     int x;
@@ -82,8 +83,7 @@ private:
     cv::Mat mapx_, mapy_;
    
     
-    cv::Size corrected_size_ = cv::Size(3000,3000);
-    cv::Size re_size_ = cv::Size(UNDISTORT_W, UNDISTORT_H);
+    cv::Size re_size_ = cv::Size(824, 624);
 
 
     struct calib_data hw_calib_data;

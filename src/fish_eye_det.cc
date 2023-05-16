@@ -18,6 +18,10 @@ FishEyeDet::FishEyeDet(int width, int height,
         undistort_scene_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
 
         GetFrame("/home/fitz/Downloads/img_data/kejian1/50/Video_20230509163621861.avi");
+        // GetFrame("/home/fitz/Downloads/img_data/kejian1/60/Video_20230509163223562.avi");
+        // GetFrame("/home/fitz/Downloads/img_data/kejian1/70/Video_20230509162748564.avi");
+        // GetFrame("/home/fitz/Downloads/img_data/kejian1/80/Video_20230509162450783.avi");
+        // GetFrame("/home/fitz/Downloads/img_data/kejian1/90/Video_20230509162050071.avi");
         // GetFrame("/home/fitz/project/tests/fif2.avi");
     
         
@@ -126,6 +130,7 @@ void FishEyeDet::GetFrame(std::string filename)
     std::unique_ptr<uint8_t[]> undistort_scene_img(new uint8_t[UNDISTORT_H * UNDISTORT_W]);
     
     while(1){
+        auto tik_b = std::chrono::system_clock::now();
         if(first_flag){
             capture >> first_frame;
 
@@ -147,6 +152,7 @@ void FishEyeDet::GetFrame(std::string filename)
             obj_image.data = undistort_obj_img.get();
             first_flag = false;
         }
+        
         capture >> frame ;
         // capture >> source_img ;
 
@@ -155,6 +161,8 @@ void FishEyeDet::GetFrame(std::string filename)
         }
 
         // cv::resize(source_img, frame, re_size_);
+        auto tik_undis = std::chrono::system_clock::now();
+
 
         cv::cvtColor(frame, frame_gray, cv::COLOR_RGB2GRAY);
         if(channels_ == 1){
@@ -166,29 +174,41 @@ void FishEyeDet::GetFrame(std::string filename)
         std::cout<<"obj image: "<<frame.channels()<<std::endl;
 
         auto tik = std::chrono::system_clock::now();
+
+
+        // cv::imshow("resize fisrt img",obj_image);
+        // cv::imshow("resie",scene_image);
+        // cv::waitKey(0);
         
 
-        cv::resize(obj_image, obj_image_resize,cv::Size(824,624));
-        cv::resize(scene_image, scene_image_resize,cv::Size(824,624));
+        // cv::resize(obj_image, obj_image_resize,cv::Size(824,624));
+        // cv::resize(scene_image, scene_image_resize,cv::Size(824,624));
         
 
-        ExtractORBFeature(obj_image_resize, scene_image_resize);
+        ExtractORBFeature(obj_image, scene_image);
         // H_ = ComputeHMatrix();
         // cv::Mat foreground_img = GetForegroundImage(obj_image, scene_image ,H_);
         // Detect(foreground_img, scene_image);
 
-        cv::Mat black_mat = cv::Mat::zeros(obj_image_resize.size(), CV_8UC1);
+        cv::Mat black_mat = cv::Mat::zeros(obj_image.size(), CV_8UC1);
         if(!less_keypoints_flag_ && !less_keypoints_ransac_flag_){        //if keypoints less than 4
             H_ = ComputeHMatrix();
-            cv::Mat foreground_img = GetForegroundImage(obj_image_resize, scene_image_resize ,H_);
-            Detect(foreground_img, scene_image_resize);
+            cv::Mat foreground_img = GetForegroundImage(obj_image, scene_image ,H_);
+            Detect(foreground_img, scene_image);
         }else{
-            Detect(black_mat, scene_image_resize);
+            Detect(black_mat, scene_image);
         }
         auto tok = std::chrono::system_clock::now();
 
         double duration_ms = std::chrono::duration<double,std::milli>(tok - tik).count();
+        double total_ms = std::chrono::duration<double,std::milli>(tok - tik_b).count();
+        double undist_ms = std::chrono::duration<double,std::milli>(tik - tik_undis).count();
+        double first_ms = std::chrono::duration<double, std::milli>(tik_undis - tik_b).count();
         std::cout << "it takes  " << duration_ms << " ms" << std::endl;
+        std::cout << "fist use time:" << first_ms << " ms"<<std::endl;
+        std::cout << "undistort use time :"<< undist_ms << "ms" << std::endl;
+        std::cout << "total use time :"<< total_ms << "ms" << std::endl;
+
 
     }
     capture.release();
@@ -268,6 +288,8 @@ void FishEyeDet::ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img ){
     // step 2: compute BRIRF descriptors according to corners positions
     descriptor->compute(obj_img, keypoints_obj_, descriptors_obj_);
     descriptor->compute(scene_img, keypoints_scene_, descriptors_scene_);
+    std::cout<<"kp size = " << keypoints_obj_.size() << "des size = "<< descriptors_obj_.type()<<std::endl;
+    std::cout<<"kp scene size = " << keypoints_scene_.size() << "des scene size = "<< descriptors_scene_.type()<<std::endl;
 
     // cv::Mat out_img;
     // // cv::drawKeypoints(obj_img, keypoints_obj_, out_img, cv::Scalar::all(-1));
@@ -485,9 +507,9 @@ cv::Mat FishEyeDet::GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::M
     cv::morphologyEx(foreground_img, fore_out, cv::MORPH_OPEN, kernel);
     
     // cv::imshow("direct diff", direct_diff);
-    // cv::imshow("diff", diff);
-    // cv::imshow("foreground", foreground_img);
-    // cv::imshow("open op img", fore_out);
+    cv::imshow("diff", diff);
+    cv::imshow("foreground", foreground_img);
+    cv::imshow("open op img", fore_out);
     // cv::waitKey(0);
 
 
@@ -715,38 +737,36 @@ void FishEyeDet::undistort_visble(int distorted_image_w, int distorted_image_h,
                                   unsigned char *undistorted_image,
                                   calib_data *calib_data, float fc) 
 {
+    TicToc tt;
     int Nxc = UNDISTORT_H / 2;
 	int Nyc = UNDISTORT_W / 2;
 	int Nzc = -UNDISTORT_W / fc;
-	float* Nx = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* Ny = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* Nz = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* NORM = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* theta = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* rho = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* x = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* y = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* mx = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
-	float* my = (float*)calloc(UNDISTORT_H * UNDISTORT_W, sizeof(float));
 
+    float* Nx = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+    float* Ny = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* Nz = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* NORM = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* theta = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* rho = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* x = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* y = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* mx = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+	float* my = (float*)malloc(UNDISTORT_H * UNDISTORT_W * sizeof(float));
+   
+
+    TicToc t_for;
 	for (int i = 0; i < UNDISTORT_H; i++)
 		for (int j = 0; j < UNDISTORT_W; j++)
 		{
 			Nx[i * UNDISTORT_W + j] = i - Nxc;
 			Ny[i * UNDISTORT_W + j] = j - Nyc;
 			Nz[i * UNDISTORT_W + j] = Nzc;
-		}
-	for (int i = 0; i < UNDISTORT_H; i++)
-		for (int j = 0; j < UNDISTORT_W; j++)
-		{
-			NORM[i * UNDISTORT_W + j] = sqrt(Nx[i * UNDISTORT_W + j]* Nx[i * UNDISTORT_W + j]+ Ny[i * UNDISTORT_W + j] * Ny[i * UNDISTORT_W + j]);
+            NORM[i * UNDISTORT_W + j] = sqrt(Nx[i * UNDISTORT_W + j]* Nx[i * UNDISTORT_W + j]+ Ny[i * UNDISTORT_W + j] * Ny[i * UNDISTORT_W + j]);
 			theta[i * UNDISTORT_W + j] = atan(Nz[i * UNDISTORT_W + j]/ (NORM[i * UNDISTORT_W + j]+0.000000000000000001));
+            rho[i * UNDISTORT_W + j] = calib_data->ocam_model.pol[0];
+
 		}
-	for (int i = 0; i < UNDISTORT_H; i++)
-		for (int j = 0; j < UNDISTORT_W; j++)
-		{
-			rho[i * UNDISTORT_W + j] = calib_data->ocam_model.pol[0];
-		}
+
 	for (int nc = 1; nc < 15; nc++)
 	{
 		for (int i = 0; i < UNDISTORT_H; i++)
@@ -760,22 +780,15 @@ void FishEyeDet::undistort_visble(int distorted_image_w, int distorted_image_h,
 		{
 			x[i * UNDISTORT_W + j] = Nx[i * UNDISTORT_W + j] / NORM[i * UNDISTORT_W + j] * rho[i * UNDISTORT_W + j];
 			y[i * UNDISTORT_W + j] = Ny[i * UNDISTORT_W + j] / NORM[i * UNDISTORT_W + j] * rho[i * UNDISTORT_W + j];
-		}
-	for (int i = 0; i < UNDISTORT_H; i++)
-		for (int j = 0; j < UNDISTORT_W; j++)
-		{
-			mx[i * UNDISTORT_W + j] = x[i * UNDISTORT_W + j] * calib_data->ocam_model.c + y[i * UNDISTORT_W + j] * calib_data->ocam_model.d + calib_data->ocam_model.xc;
+            mx[i * UNDISTORT_W + j] = x[i * UNDISTORT_W + j] * calib_data->ocam_model.c + y[i * UNDISTORT_W + j] * calib_data->ocam_model.d + calib_data->ocam_model.xc;
 			my[i * UNDISTORT_W + j] = x[i * UNDISTORT_W + j] * calib_data->ocam_model.e + y[i * UNDISTORT_W + j]                            + calib_data->ocam_model.yc;
-
-		}
-	for (int i = 0; i < UNDISTORT_H; i++)
-		for (int j = 0; j < UNDISTORT_W; j++)
-		{
-			int px = mx[i * UNDISTORT_W + j];
+            int px = mx[i * UNDISTORT_W + j];
 			int py = my[i * UNDISTORT_W + j];
 			if(px>=0&&px< distorted_image_h&& py >= 0 && py < distorted_image_w)
 			undistorted_image[i * UNDISTORT_W + j] = distorted_image[px* distorted_image_w + py];
+
 		}
+        std::cout << "for use time" << t_for.toc() << std::endl;
 
 
 	free(Nx);
@@ -788,48 +801,7 @@ void FishEyeDet::undistort_visble(int distorted_image_w, int distorted_image_h,
 	free(y);
 	free(mx);
 	free(my);
+    std::cout << "all use time:"<< tt.toc() <<std::endl;
 }
 
-void FishEyeDet::Image2Video() 
-{
-    cv::VideoWriter writer;
-    std::string path_src = "/home/fitz/project/fishEyeDect/image/";
-    std::string s_image_name;
-    int isColor = 0; 
-    int frame_fps = 20;  
-    int frame_width = 640;  
-    int frame_height = 512;
-    std::string video_name = "./out2.mp4";    
-    writer = cv::VideoWriter(video_name, CV_FOURCC('m', 'p', '4', 'v'),frame_fps,cv::Size(frame_width,frame_height),true); 
-    if(!writer.isOpened())
-    {
-        std::cout<< "Error : fail to open video writer\n"<<std::endl;
-    } 
-    cv::namedWindow("image to video", CV_WINDOW_AUTOSIZE);
-    int num = 43;
-    int i = 0;
-    cv::Mat img;
-    while(i<num){
-        s_image_name = path_src + std::to_string(++i)+".png";
-        img = cv::imread(s_image_name);
-        if (!img.data)//判断图片调入是否成功  
-        {  
-            std::cout <<s_image_name<<std::endl;
-            std::cout << "Could not load image file...\n" << std::endl;  
-        }  
-        std::cout << "image sieze"<<img.size() << std::endl;
-        cv::imshow("image to video",img);
-        cv::Mat image = cv::Mat::zeros(640, 512, CV_8UC3);
-        image.setTo(cv::Scalar(100, 0, 0));
 
-        //写入  
-        writer.write(image);  
-        // if (cv::waitKey(3) == 27 || i > 43)  
-        // {  
-        //     std::cout << "touch ESC" << std::endl;  
-        //     break;  
-        // } 
-
-    }
-    writer.release();
-}

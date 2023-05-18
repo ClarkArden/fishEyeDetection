@@ -100,6 +100,10 @@ private:
     bool first_flag_ = true;
     cv::Mat obj_image_, scene_image_;
 
+    // grid
+    std::vector<std::vector<cv::KeyPoint>> obj_kp_n_filter_, scene_kp_n_filter_;
+    std::vector<std::vector<cv::DMatch>> matches_filter_;
+
 
 
 public:
@@ -113,16 +117,27 @@ private:
     void GetFrame(std::string filename);
     cv::Mat GetDetectImg(unsigned char* src_data);
     void ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img);
-    cv::Mat ComputeHMatrix();
+    void SplitFeatureNGrid(int n,int h, int w, std::vector<cv::KeyPoint> obj_kp, cv::Mat obj_desc, std::vector<cv::KeyPoint> scene_kp, cv::Mat scene_desc,
+                          std::vector<std::vector<cv::KeyPoint>> &obj_kp_n, std::vector<cv::Mat> &obj_desc_n,
+                          std::vector<std::vector<cv::KeyPoint>> &scenen_kp_n, std::vector<cv::Mat> &scene_desc_n);
+    void MatchFeatureNGrid(std::vector<std::vector<cv::KeyPoint>> obj_kp_n, std::vector<cv::Mat> obj_desc_n,
+                          std::vector<std::vector<cv::KeyPoint>> scenen_kp_n, std::vector<cv::Mat> scene_desc_n,
+                          std::vector<std::vector<cv::DMatch>> &match,
+                          std::vector<std::vector<cv::KeyPoint>> &obj_kp_out, std::vector<std::vector<cv::KeyPoint>> &scene_kp_out);
+    cv::Mat ComputeHMatrix(std::vector<cv::KeyPoint> obj_kp, std::vector<cv::KeyPoint> scene_kp, std::vector<cv::DMatch> match);
     cv::Mat TransformFromObjToScene(cv::Mat obj_image, cv::Mat H);
-    cv::Mat GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::Mat H);
+    cv::Mat GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::Mat g_H, std::vector<cv::Mat> H_vec);
     cv::Mat Detect(cv::Mat img, cv::Mat background);
+    std::vector<cv::Mat> SplitImageN(cv::Mat img, int n);
+    cv::Mat ConcatImage(std::vector<cv::Mat> grid_img);
     void imgstrech16_to_8(unsigned short * img,uint8_t* out,int w,int h);
     void init_calib_data();
     void init_calib_data_visibleLight();
     void undistort(int distorted_image_w, int distorted_image_h,unsigned char* distorted_image, unsigned char* undistorted_image, struct calib_data* calib_data, float fc);
     void undistort_visble(int distorted_image_w, int distorted_image_h,unsigned char* distorted_image, unsigned char* undistorted_image, struct calib_data* calib_data, float fc);
-    void Image2Video();
+    void test();
+    cv::Mat imgTranslate(cv::Mat &matSrc, int xOffset, int yOffset, bool bScale);
+
 };
 
 

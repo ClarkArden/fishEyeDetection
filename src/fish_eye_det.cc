@@ -16,6 +16,7 @@ FishEyeDet::FishEyeDet(int width, int height,
         }
         undistort_obj_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
         undistort_scene_img_ = std::make_unique<uint8_t[]>(UNDISTORT_H * UNDISTORT_W);
+        test();
 
         GetFrame("/home/fitz/Downloads/img_data/kejian1/50/Video_20230509163621861.avi");
         // GetFrame("/home/fitz/Downloads/img_data/kejian1/60/Video_20230509163223562.avi");
@@ -183,7 +184,8 @@ void FishEyeDet::GetFrame(std::string filename)
 
         // cv::resize(obj_image, obj_image_resize,cv::Size(824,624));
         // cv::resize(scene_image, scene_image_resize,cv::Size(824,624));
-        
+        // obj_image = scene_image;
+        // scene_image = imgTranslate(scene_image, 50, 0, false);
 
         ExtractORBFeature(obj_image, scene_image);
         // H_ = ComputeHMatrix();
@@ -192,8 +194,17 @@ void FishEyeDet::GetFrame(std::string filename)
 
         cv::Mat black_mat = cv::Mat::zeros(obj_image.size(), CV_8UC1);
         if(!less_keypoints_flag_ && !less_keypoints_ransac_flag_){        //if keypoints less than 4
-            H_ = ComputeHMatrix();
-            cv::Mat foreground_img = GetForegroundImage(obj_image, scene_image ,H_);
+            H_ = ComputeHMatrix(rr_keypoints_obj_, rr_keypoints_scene_, rr_matches_);
+            std::vector<cv::Mat> H_vec;
+            for(int i= 0; i < matches_filter_.size(); i++){
+                if(matches_filter_[i].size()<5){
+                    H_vec.push_back(H_);
+                }else{
+                    H_vec.push_back(ComputeHMatrix(obj_kp_n_filter_[i], scene_kp_n_filter_[i], matches_filter_[i]));
+                }
+            }
+
+            cv::Mat foreground_img = GetForegroundImage(obj_image, scene_image ,H_, H_vec);
             Detect(foreground_img, scene_image);
         }else{
             Detect(black_mat, scene_image);
@@ -217,58 +228,58 @@ void FishEyeDet::GetFrame(std::string filename)
 
 cv::Mat FishEyeDet::GetDetectImg(unsigned char* src_data) 
 { 
-    if(channels_ == 1){
-        src_img_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
-    }else{
-        src_img_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC3);
-    }
-    src_img_.data = src_data;
-    if(first_flag_){
-        first_frame_ = src_img_;
-        if(channels_ == 1){
-            undistort(first_frame_.cols, first_frame_.rows, first_frame_.data,undistort_obj_img_.get(),&hw_calib_data, 6.0 );
-        }else{
-            cv::Mat first_frame_gray;
-            cv::cvtColor(first_frame_, first_frame_gray, cv::COLOR_RGB2GRAY);
-            undistort_visble(first_frame_gray.cols, first_frame_gray.rows, first_frame_gray.data,undistort_obj_img_.get(),&kj_calib_data, 6.0 );
-        }
-        obj_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
-        obj_image_.data = undistort_obj_img_.get();
-        first_flag_ = false;
-    }
-    cv::Mat gray_frame;                                     // all image convert to gray img
-    if(channels_ == 3){
-        cv::cvtColor(src_img_, gray_frame,cv::COLOR_RGB2GRAY);
-    }else{
-        gray_frame = src_img_;
-    }
+    // if(channels_ == 1){
+    //     src_img_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
+    // }else{
+    //     src_img_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC3);
+    // }
+    // src_img_.data = src_data;
+    // if(first_flag_){
+    //     first_frame_ = src_img_;
+    //     if(channels_ == 1){
+    //         undistort(first_frame_.cols, first_frame_.rows, first_frame_.data,undistort_obj_img_.get(),&hw_calib_data, 6.0 );
+    //     }else{
+    //         cv::Mat first_frame_gray;
+    //         cv::cvtColor(first_frame_, first_frame_gray, cv::COLOR_RGB2GRAY);
+    //         undistort_visble(first_frame_gray.cols, first_frame_gray.rows, first_frame_gray.data,undistort_obj_img_.get(),&kj_calib_data, 6.0 );
+    //     }
+    //     obj_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
+    //     obj_image_.data = undistort_obj_img_.get();
+    //     first_flag_ = false;
+    // }
+    // cv::Mat gray_frame;                                     // all image convert to gray img
+    // if(channels_ == 3){
+    //     cv::cvtColor(src_img_, gray_frame,cv::COLOR_RGB2GRAY);
+    // }else{
+    //     gray_frame = src_img_;
+    // }
 
-    frame_ = gray_frame;
+    // frame_ = gray_frame;
 
-    if(channels_ == 1){
-        undistort(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&hw_calib_data, 6.0 );
-    }else{
-        undistort_visble(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&kj_calib_data, 6.0 );
-    }
-    scene_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
-    scene_image_.data = undistort_scene_img_.get();
+    // if(channels_ == 1){
+    //     undistort(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&hw_calib_data, 6.0 );
+    // }else{
+    //     undistort_visble(frame_.cols, frame_.rows, frame_.data, undistort_scene_img_.get(),&kj_calib_data, 6.0 );
+    // }
+    // scene_image_.create(cv::Size(UNDISTORT_W, UNDISTORT_H), CV_8UC1);
+    // scene_image_.data = undistort_scene_img_.get();
 
-    auto tik = std::chrono::system_clock::now();
+    // auto tik = std::chrono::system_clock::now();
 
-    ExtractORBFeature(obj_image_, scene_image_);
+    // ExtractORBFeature(obj_image_, scene_image_);
     
-    cv::Mat black_mat = cv::Mat::zeros(obj_image_.size(), CV_8UC1);
-    if(!less_keypoints_flag_ && !less_keypoints_ransac_flag_){        //if keypoints less than 4
-        H_ = ComputeHMatrix();
-        cv::Mat foreground_img = GetForegroundImage(obj_image_, scene_image_ ,H_);
-        Detect(foreground_img, scene_image_);
-    }else{
-        Detect(black_mat, scene_image_);
-    }
-    auto tok = std::chrono::system_clock::now();
+    // cv::Mat black_mat = cv::Mat::zeros(obj_image_.size(), CV_8UC1);
+    // if(!less_keypoints_flag_ && !less_keypoints_ransac_flag_){        //if keypoints less than 4
+    //     H_ = ComputeHMatrix(rr_keypoints_obj_, rr_keypoints_scene_, rr_matches_);
+    //     cv::Mat foreground_img = GetForegroundImage(obj_image_, scene_image_ ,H_);
+    //     Detect(foreground_img, scene_image_);
+    // }else{
+    //     Detect(black_mat, scene_image_);
+    // }
+    // auto tok = std::chrono::system_clock::now();
 
-    double duration_ms = std::chrono::duration<double,std::milli>(tok - tik).count();
-    std::cout << "it takes  " << duration_ms << " ms" << std::endl;
+    // double duration_ms = std::chrono::duration<double,std::milli>(tok - tik).count();
+    // std::cout << "it takes  " << duration_ms << " ms" << std::endl;
 
 
     return cv::Mat(); 
@@ -276,8 +287,9 @@ cv::Mat FishEyeDet::GetDetectImg(unsigned char* src_data)
 
 void FishEyeDet::ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img ){
     // initialize
+    int features  = 2500;
     cv::Ptr<cv::FeatureDetector> detector = cv::ORB::create();
-    cv::Ptr<cv::DescriptorExtractor> descriptor = cv::ORB::create();
+    cv::Ptr<cv::DescriptorExtractor> descriptor = cv::ORB::create(features);
 
     cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
 
@@ -290,6 +302,31 @@ void FishEyeDet::ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img ){
     descriptor->compute(scene_img, keypoints_scene_, descriptors_scene_);
     std::cout<<"kp size = " << keypoints_obj_.size() << "des size = "<< descriptors_obj_.type()<<std::endl;
     std::cout<<"kp scene size = " << keypoints_scene_.size() << "des scene size = "<< descriptors_scene_.type()<<std::endl;
+
+    std::vector<std::vector<cv::KeyPoint>> obj_kp_n, scene_kp_n;
+    std::vector<cv::Mat> obj_desc_n, scene_desc_n;
+    SplitFeatureNGrid(2, obj_img.rows, obj_img.cols, keypoints_obj_, descriptors_obj_, keypoints_scene_, descriptors_scene_,
+                        obj_kp_n, obj_desc_n, scene_kp_n, scene_desc_n);
+    
+    std::vector<std::vector<cv::KeyPoint>> obj_kp_n_filter, scene_kp_n_filter;
+    std::vector<std::vector<cv::DMatch>> matches_filter;
+
+    MatchFeatureNGrid(obj_kp_n,obj_desc_n, scene_kp_n, scene_desc_n, matches_filter, obj_kp_n_filter, scene_kp_n_filter);
+    obj_kp_n_filter_ = obj_kp_n_filter;
+    scene_kp_n_filter_= scene_kp_n_filter;
+    matches_filter_ = matches_filter;
+
+    // for(int i=0 ;i< 9;i++){
+        
+    //     std::cout <<i << "-th block ::"<<" obj kp filter size: " << obj_kp_n_filter[i].size()<< " scene kp filter size: " << scene_kp_n_filter[i].size();
+    //     std::cout<<"match size: "<<matches_filter[i].size()<<std::endl;
+    // }
+    cv::Mat grid_img;
+    // for(int i=0; i< obj_kp_n_filter.size(); i++){
+    // }
+    cv::drawMatches(obj_img, obj_kp_n_filter[3],scene_img, scene_kp_n_filter[3] , matches_filter[3], grid_img);
+    cv::imshow("grid_img", grid_img);
+    // cv::waitKey(0);
 
     // cv::Mat out_img;
     // // cv::drawKeypoints(obj_img, keypoints_obj_, out_img, cv::Scalar::all(-1));
@@ -447,23 +484,23 @@ void FishEyeDet::ExtractORBFeature(cv::Mat obj_img, cv::Mat scene_img ){
 
 }
 
-cv::Mat FishEyeDet::ComputeHMatrix()
+cv::Mat FishEyeDet::ComputeHMatrix(std::vector<cv::KeyPoint> obj_kp, std::vector<cv::KeyPoint> scene_kp, std::vector<cv::DMatch> match)
 {
     //-- Localize the object
     std::vector<cv::Point2f> obj;
     std::vector<cv::Point2f> scene;
     
-    cv::Point2f srcTri[rr_matches_.size()];
-    cv::Point2f dstTri[rr_matches_.size()];
+    // cv::Point2f srcTri[rr_matches_.size()];
+    // cv::Point2f dstTri[rr_matches_.size()];
 
 
     //-- Get the keypoints from the good matches
-    for(size_t i = 0; i < rr_matches_.size(); i++){
-        obj.push_back(rr_keypoints_obj_[rr_matches_[i].queryIdx].pt);
-        scene.push_back(rr_keypoints_scene_[rr_matches_[i].trainIdx].pt);
+    for(size_t i = 0; i < match.size(); i++){
+        obj.push_back(obj_kp[match[i].queryIdx].pt);
+        scene.push_back(scene_kp[match[i].trainIdx].pt);
 
-        srcTri[i] = rr_keypoints_obj_[rr_matches_[i].queryIdx].pt;
-        dstTri[i] = rr_keypoints_scene_[rr_matches_[i].trainIdx].pt;
+        // srcTri[i] = rr_keypoints_obj_[rr_matches_[i].queryIdx].pt;
+        // dstTri[i] = rr_keypoints_scene_[rr_matches_[i].trainIdx].pt;
     }
     // cv::Mat h = cv::Mat::eye(3,3, CV_32F);
 
@@ -487,22 +524,103 @@ cv::Mat FishEyeDet::TransformFromObjToScene(cv::Mat obj_image, cv::Mat H)
 
 }
 
-cv::Mat FishEyeDet::GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::Mat H) 
+void FishEyeDet::SplitFeatureNGrid(int n,int h, int w, std::vector<cv::KeyPoint> obj_kp, 
+                        cv::Mat obj_desc, std::vector<cv::KeyPoint> scene_kp, cv::Mat scene_desc,
+                          std::vector<std::vector<cv::KeyPoint>> &obj_kp_n, std::vector<cv::Mat> &obj_desc_n,
+                          std::vector<std::vector<cv::KeyPoint>> &scenen_kp_n, std::vector<cv::Mat> &scene_desc_n)
+{
+    int slide_w = w / n, slide_h = h / n;
+    
+    obj_kp_n.resize(n * n);
+    scenen_kp_n.resize(n * n);
+    std::vector<std::vector<cv::Mat>> temp_obj_desc_n(n * n);
+    std::vector<std::vector<cv::Mat>> temp_scene_desc_n(n * n);
+
+    for(int index = 0; index < obj_kp.size(); index++){
+        int num_block = 0;
+        float xx = obj_kp[index].pt.x;
+        float yy = obj_kp[index].pt.y;
+        
+        for(int i=0 ; i < n ; i++){
+            for(int j = 0; j <n ; j++){
+                int x = j * slide_w;
+                int y = i * slide_h;
+                if(xx>= x && xx < x + slide_w && yy>= y && yy < y + slide_h){
+                    obj_kp_n[num_block].push_back(obj_kp[index]);
+                    temp_obj_desc_n[num_block].push_back(obj_desc.rowRange(index,index + 1).clone());
+
+                }
+                num_block++;
+                
+            }
+        }
+    }
+
+    for(int index = 0; index < scene_kp.size(); index++){
+        int num_block = 0;
+        float xx = scene_kp[index].pt.x;
+        float yy = scene_kp[index].pt.y;
+        
+        for(int i=0 ; i < n ; i++){
+            for(int j = 0; j <n ; j++){
+                int x = j * slide_w;
+                int y = i * slide_h;
+                
+                if(xx>= x && xx < x + slide_w && yy>= y && yy < y + slide_h){
+                    scenen_kp_n[num_block].push_back(scene_kp[index]);
+                    temp_scene_desc_n[num_block].push_back(scene_desc.rowRange(index,index + 1).clone());
+                }
+                num_block++;
+                
+            }
+        }
+    }
+    
+
+    cv::Mat  result_desc;
+    
+    for(int i=0; i < temp_obj_desc_n.size(); i++){
+        cv::vconcat(temp_obj_desc_n[i],result_desc);
+        obj_desc_n.push_back(result_desc);
+        result_desc.release();
+    }
+    for(int i=0; i < temp_scene_desc_n.size(); i++){
+        cv::vconcat(temp_scene_desc_n[i],result_desc);
+        scene_desc_n.push_back(result_desc);
+        result_desc.release();
+    }
+    
+}
+
+cv::Mat FishEyeDet::GetForegroundImage(cv::Mat obj_img, cv::Mat scene_img, cv::Mat g_H, std::vector<cv::Mat> H_vec) 
 {   
-    std::cout << "H = " << H << std::endl;
+    std::cout << "H = " << g_H << std::endl;
 
-    cv::Mat img_T_scene = TransformFromObjToScene(obj_img, H);
+    auto split_img = SplitImageN(obj_img, 2);
 
-    // cv::imshow("Transform img scene", img_T_scene);
+    std::vector<cv::Mat> img_T_scene_vec;
+    for(int i=0; i < split_img.size(); i++){
+        cv::Mat img_T_scene = TransformFromObjToScene(split_img[i], H_vec[i]);
+        img_T_scene_vec.push_back(img_T_scene);
+    }
+    std::cout << "H _matric =  " << H_vec[0] << std::endl;
+
+    // cv::Mat img_T_scene = TransformFromObjToScene(obj_img, g_H);
+    
+    
+    cv::Mat img_T_scene_concat = ConcatImage(img_T_scene_vec);
+    
+
+    cv::imshow("Transform img scene concat", img_T_scene_concat);
     // cv::imshow("undistort obj ", obj_img);
     // cv::imshow("undistort scene ",scene_img);
    
     cv::Mat diff, direct_diff;
     cv::Mat foreground_img, fore_out;
-    cv::absdiff(img_T_scene, scene_img, diff);               //转换后相减
-    cv::absdiff(obj_img, scene_img, direct_diff);  //两幅图直接相减（对比）
+    cv::absdiff(img_T_scene_concat, scene_img, diff);               //转换后相减
+    // cv::absdiff(obj_img, scene_img, direct_diff);  //两幅图直接相减（对比）
     cv::threshold(diff, foreground_img, 15, 255, cv::THRESH_BINARY);
-    // cv::adaptiveThreshold(diff, foreground_img, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY_INV,11, 4);
+    // // cv::adaptiveThreshold(diff, foreground_img, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY_INV,11, 4);
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2,3));
     cv::morphologyEx(foreground_img, fore_out, cv::MORPH_OPEN, kernel);
     
@@ -535,7 +653,7 @@ cv::Mat  FishEyeDet::Detect(cv::Mat img, cv::Mat background){
         }
     }
     cv::imshow("detect show",detec_img);
-    cv::waitKey(1);
+    cv::waitKey(0);
 
     // bbox.print_info();
     // std::cout<<"x="<<L_tgt[0].x<<"y = "<<L_tgt[0].y<<"w="<<L_tgt[0].w<<"h="<<L_tgt[0].h<<std::endl;
@@ -545,8 +663,60 @@ cv::Mat  FishEyeDet::Detect(cv::Mat img, cv::Mat background){
 
 }
 
-void FishEyeDet::imgstrech16_to_8(unsigned short * img,uint8_t* out,int w,int h)
-{
+std::vector<cv::Mat> FishEyeDet::SplitImageN(cv::Mat img, int n) {
+    std::vector<cv::Mat> res;
+
+    int h = img.rows;
+    int w = img.cols;
+    int slide_h = h / n;
+    int slide_w = w / n;
+
+    for(int i = 0; i < n ;i++){
+        for(int j = 0; j < n; j++){
+            int x = j * slide_w;
+            int y = i * slide_h;
+
+            int x2 = x + slide_w;
+            int y2 = y + slide_h;
+            if(j ==  n - 1){
+                x2 = w;
+            }
+            if(i == n - 1){
+                y2 = h;
+            }
+
+            cv::Mat img_sub = img(cv::Rect(x, y, x2 - x, y2 - y));
+            res.push_back(img_sub);
+
+        }
+    }
+    return res;
+
+}
+
+cv::Mat FishEyeDet::ConcatImage(std::vector<cv::Mat> grid_img) {
+    int n = grid_img.size();
+    int n_s = std::sqrt(n);
+    std::vector<std::vector<cv::Mat>> img_h(n_s);
+    std::vector<cv::Mat> img_v;
+    cv::Mat res;
+    
+    for(int i = 0; i < n; i++){
+        img_h[i/n_s].push_back(grid_img[i]);
+    }
+
+    for(int i = 0; i< n_s; i++){
+        cv::Mat temp;
+        cv::hconcat(img_h[i], temp);
+        img_v.push_back(temp);
+
+    }
+    cv::vconcat(img_v, res);
+    return res;
+}
+
+void FishEyeDet::imgstrech16_to_8(unsigned short* img, uint8_t* out, int w,
+                                  int h) {
     int i;
     int hisimg[16384]={0};
     unsigned short maxvalue=0,minvalue=0xffff;
@@ -580,6 +750,160 @@ void FishEyeDet::imgstrech16_to_8(unsigned short * img,uint8_t* out,int w,int h)
     }
 }
 
+cv::Mat FishEyeDet::imgTranslate(cv::Mat& matSrc, int xOffset, int yOffset,
+                                 bool bScale) {
+    
+    int nRows = matSrc.rows;
+    int nCols = matSrc.cols;
+    int nRowsRet = 0;
+    int nColsRet = 0;
+    cv::Rect rectSrc;
+    cv::Rect rectRet;
+    if (bScale)
+    {
+        nRowsRet = nRows + abs(yOffset);
+        nColsRet = nCols + abs(xOffset);
+        rectSrc.x = 0;
+        rectSrc.y = 0;
+        rectSrc.width = nCols;
+        rectSrc.height = nRows;
+    }
+    else
+    {
+        nRowsRet = matSrc.rows;
+        nColsRet = matSrc.cols;
+        if (xOffset >= 0)
+        {
+            rectSrc.x = 0;
+        }
+        else
+        {
+            rectSrc.x = abs(xOffset);
+        }
+        if (yOffset >= 0)
+        {
+            rectSrc.y = 0;
+        }
+        else
+        {
+            rectSrc.y = abs(yOffset);
+        }
+        rectSrc.width = nCols - abs(xOffset);
+        rectSrc.height = nRows - abs(yOffset);
+    }
+    // 修正输出的ROI
+    if (xOffset >= 0)
+    {
+        rectRet.x = xOffset;
+    }
+    else
+    {
+        rectRet.x = 0;
+    }
+    if (yOffset >= 0)
+    {
+        rectRet.y = yOffset;
+    }
+    else
+    {
+        rectRet.y = 0;
+    }
+    rectRet.width = rectSrc.width;
+    rectRet.height = rectSrc.height;
+    // 复制图像
+    cv::Mat matRet(nRowsRet, nColsRet, matSrc.type(), cv::Scalar(0));
+    matSrc(rectSrc).copyTo(matRet(rectRet));
+    return matRet;
+
+    return cv::Mat();
+}
+
+void FishEyeDet::MatchFeatureNGrid(
+                        std::vector<std::vector<cv::KeyPoint>> obj_kp_n, std::vector<cv::Mat> obj_desc_n,
+                          std::vector<std::vector<cv::KeyPoint>> scenen_kp_n, std::vector<cv::Mat> scene_desc_n,
+                          std::vector<std::vector<cv::DMatch>> &match,
+                          std::vector<std::vector<cv::KeyPoint>> &obj_kp_out, std::vector<std::vector<cv::KeyPoint>> &scene_kp_out) 
+{
+    int n = obj_kp_n.size();
+    match.resize(n );
+    obj_kp_out.resize(n);
+    scene_kp_out.resize(n);
+
+    for(int i = 0; i < obj_kp_n.size(); i++){
+        std::vector<cv::KeyPoint> obj_kp = obj_kp_n[i];
+        std::vector<cv::KeyPoint> scene_kp = scenen_kp_n[i];
+        cv::Mat obj_desc = obj_desc_n[i];
+        cv::Mat scene_desc = scene_desc_n[i];
+        // std::cout << " obj keypoint size: "<<obj_kp.size() << "obj desc size: " << obj_desc.size() << std::endl;
+        // std::cout << " scene keypoint size: "<<scene_kp.size() << "scene desc size: " << scene_desc.size() << std::endl;
+
+        if(obj_kp.size() < 11 || scene_kp.size() < 11){
+            continue;
+        }
+        cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
+        std::vector<cv::DMatch> matchs_first;
+        matcher->match(obj_desc, scene_desc, matchs_first);
+
+        double min_dist = 1000000, max_dist = 0;
+        for(int i = 0; i < obj_desc.rows; i++){
+            double dist = matchs_first[i].distance;
+            if(dist < min_dist) min_dist = dist;
+            if(dist > max_dist) max_dist = dist;
+
+        }
+        std::vector<cv::DMatch> matchs_second;
+        for(int i = 0; i < obj_desc.rows; i++){
+            if(matchs_first[i].distance <= std::max(3 * min_dist, 10.0))
+            {
+                matchs_second.push_back(matchs_first[i]);
+            }
+        }
+        if(matchs_second.size() < 10){
+            continue;
+        }
+        std::vector<cv::DMatch> temp_matches;
+        temp_matches = matchs_second;
+        std::vector<cv::KeyPoint> ran_keypoint_obj, ran_keypoint_scene;
+        for(size_t i = 0; i < temp_matches.size(); i++)
+        {
+            ran_keypoint_obj.push_back(obj_kp[temp_matches[i].queryIdx]);
+            ran_keypoint_scene.push_back(scene_kp[temp_matches[i].trainIdx]);
+        }
+
+        std::vector<cv::Point2f> point_obj, point_scene;
+        for(size_t i = 0; i<temp_matches.size(); i++)
+        {
+            point_obj.push_back(ran_keypoint_obj[i].pt);
+            point_scene.push_back(ran_keypoint_scene[i].pt);
+        }
+        
+        std::vector<uchar> RansacStatus;
+        cv::Mat fundamental_matrix = cv::findFundamentalMat(point_obj, point_scene, RansacStatus, cv::FM_RANSAC, 0.05, 0.99);
+        std::vector<cv::KeyPoint> rr_keypoints_obj, rr_keypoints_scene;
+        std::vector<cv::DMatch> rr_matches;
+        int index = 0;
+        for(size_t i = 0; i< temp_matches.size(); i++)
+        {
+            if(RansacStatus[i] != 0)
+            {
+                rr_keypoints_obj.push_back(ran_keypoint_obj[i]);
+                rr_keypoints_scene.push_back(ran_keypoint_scene[i]);
+                temp_matches[i].queryIdx = index;
+                temp_matches[i].trainIdx = index;
+                rr_matches.push_back(temp_matches[i]);
+                index++;
+            }
+        }
+        match[i] = rr_matches;
+        obj_kp_out[i] = rr_keypoints_obj;
+        scene_kp_out[i] = rr_keypoints_scene;
+
+
+
+        
+    }
+
+}
 
 void FishEyeDet::init_calib_data() 
 {
@@ -804,4 +1128,14 @@ void FishEyeDet::undistort_visble(int distorted_image_w, int distorted_image_h,
     std::cout << "all use time:"<< tt.toc() <<std::endl;
 }
 
-
+void FishEyeDet::test() 
+{
+    std::vector<int> a(10);
+    
+    for(int i = 11; i > 0; i--){
+        a[i] = i-10;
+    }
+    for(int i=0; i<a.size();i++){
+        std::cout<<"test = "<<a[i] <<std::endl;
+    }
+}
